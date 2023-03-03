@@ -1,0 +1,107 @@
+/*
+Напиши програма за arduino uno - контролер за 
+4 зонна напоителна система с lcd 1602,времената да се записват в масив , индивидуално променяне на времето за работа на всяка зона, възможност за избор колко зони да работят едновременно, промяна на времето за работа и повторение с джойстик, масивът с времена да се запише в eeprom паметта така че при спиране на захранването и повторно стартиране да могат да се заредят, програмата да се направи с необходимите проверки
+
+*/
+#include <LiquidCrystal.h>
+#include <EEPROM.h>
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+const int NUM_ZONES = 4;
+const int JOYSTICK_PIN = A0;
+const int ZONE_PINS[NUM_ZONES] = {6, 7, 8, 9};
+const int EEPROM_ADDR = 0;
+const int EEPROM_SIZE = sizeof(int) * NUM_ZONES;
+
+int zoneTimes[NUM_ZONES] = {30, 30, 30, 30};
+int selectedZones = NUM_ZONES;
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.print("Zone Controller");
+
+  pinMode(JOYSTICK_PIN, INPUT);
+
+  for (int i = 0; i < NUM_ZONES; i++) {
+    pinMode(ZONE_PINS[i], OUTPUT);
+  }
+
+  // Read zone times from EEPROM
+  for (int i = 0; i < NUM_ZONES; i++) {
+    int addr = EEPROM_ADDR + (i * sizeof(int));
+    int time = EEPROM.read(addr);
+    if (time >= 1 && time <= 120) {
+      zoneTimes[i] = time;
+    }
+  }
+}
+
+void loop() {
+  int joystickVal = analogRead(JOYSTICK_PIN);
+  if (joystickVal < 100) {
+    // Decrease selected zones
+    if (selectedZones > 1) {
+      selectedZones--;
+      lcd.setCursor(0, 1);
+      lcd.print("Zones: ");
+      lcd.print(selectedZones);
+    }
+    delay(200);
+  } else if (joystickVal > 900) {
+    // Increase selected zones
+    if (selectedZones < NUM_ZONES) {
+      selectedZones++;
+      lcd.setCursor(0, 1);
+      lcd.print("Zones: ");
+      lcd.print(selectedZones);
+    }
+    delay(200);
+  } else {
+    // Run selected zones
+    lcd.clear();
+    for (int i = 0; i < NUM_ZONES; i++) {
+      if (i < selectedZones) {
+        lcd.setCursor(0, i);
+        lcd.print("Zone ");
+        lcd.print(i + 1);
+        lcd.print(": ");
+        lcd.print(zoneTimes[i]);
+        lcd.print("s");
+        digitalWrite(ZONE_PINS[i], HIGH);
+        delay(zoneTimes[i] * 1000);
+        digitalWrite(ZONE_PINS[i], LOW);
+      }
+    }
+  }
+
+  // Change zone times with joystick
+  for (int i = 0; i < NUM_ZONES; i++) {
+    int joystickVal = analogRead(JOYSTICK_PIN);
+    if (joystickVal < 100) {
+      // Decrease time
+      if (zoneTimes[i] > 1) {
+        zoneTimes[i]--;
+        updateZoneTime(i);
+      }
+      delay(200);
+    } else if (joystickVal > 900) {
+      // Increase time
+      if (zoneTimes[i] < 120) {
+        zoneTimes[i]++;
+        updateZoneTime(i);
+      }
+      delay(200);
+    }
+  }
+}
+
+void updateZoneTime(int zoneIndex) {
+  lcd.setCursor(0, zoneIndex);
+  lcd.print("Zone ");
+  lcd.print(zoneIndex + 1);
+  lcd.print(": ");
+  lcd.print(zoneTimes[zoneIndex]);
+  lcd.print("s");
+
+  int addr = EEPROM_ADDR + (zoneIndex * sizeof(int));
