@@ -105,3 +105,8 @@ void updateZoneTime(int zoneIndex) {
   lcd.print("s");
 
   int addr = EEPROM_ADDR + (zoneIndex * sizeof(int));
+  // Update zone time in EEPROM
+EEPROM.write(addr, zoneTimes[zoneIndex]);
+}
+
+// End of code
